@@ -8,7 +8,7 @@ module.exports = {
   siteMetadata: {
     siteTitle: `Shubham`,
     siteTitleAlt: `shubham's space`,
-    siteHeadline: `Incoherent Ramblings`,
+    siteHeadline: `Ramblings of a mad-man`,
     siteUrl: `https://shbm.in/`,
     siteDescription: `Hello`,
     siteLanguage: `English`,
@@ -35,7 +35,7 @@ module.exports = {
           },
           {
             name: `Linkedin`,
-            url: `https://www.linkedin.com/in/shubhams09`,
+            url: `https://www.linkedin.com/in/shbm`,
           },
           {
             name: `Email`,
