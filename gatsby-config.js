@@ -32,6 +32,10 @@ module.exports = {
             name: `Linkedin`,
             url: `https://www.linkedin.com/in/shubhams09`,
           },
+          {
+            name: `Email`,
+            url: `mailto:shbm09@gmail.com`,
+          },
         ],
       },
     },
