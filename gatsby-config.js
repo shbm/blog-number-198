@@ -9,7 +9,7 @@ module.exports = {
     siteTitle: `Shubham`,
     siteTitleAlt: `Shubham's space`,
     siteHeadline: `Incoherent Ramblings`,
-    siteUrl: `https://shbm.gtsb.io/`,
+    siteUrl: `https://shbm.in/`,
     siteDescription: `Hello`,
     siteLanguage: `English`,
   },
