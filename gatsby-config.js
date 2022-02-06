@@ -34,10 +34,6 @@ module.exports = {
             url: `https://twitter.com/global_minima`,
           },
           {
-            name: `Linkedin`,
-            url: `https://www.linkedin.com/in/shbm`,
-          },
-          {
             name: `Email`,
             url: `mailto:shbm09@gmail.com`,
           },
