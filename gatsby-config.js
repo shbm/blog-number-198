@@ -34,6 +34,10 @@ module.exports = {
             url: `https://twitter.com/global_minima`,
           },
           {
+            name: `Bookmarks`,
+            url: `/bookmarks`,
+          },
+          {
             name: `Email`,
             url: `mailto:shbm09@gmail.com`,
           },
