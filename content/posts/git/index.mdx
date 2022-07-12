@@ -1,0 +1,623 @@
+---
+title: Peeking inside .git
+date: 2022-02-08
+tags:
+  - engineering
+---
+
+To users, git is a VCS, but for designers, it’s a **content-addressable system**. The core of git is essentially a hash table. Any kind of data can be inserted in git and it returns a unique key, which is used to fetch that object.
+
+Git is designed like a bathroom. It has porcelain commands and plumbing commands. You interact with the porcelain but underneath there’s plumbing. Plumbing is for computers and porcelain is for humans. Porcelain is built upon plumbing. There's a section towards the end called "bottoms up git". We will learn about how to commit using porcelain commands.
+
+Git commands are a leaky abstraction over the data storage. You tell Git that you want to save a snapshot of your project and it basically records a manifest of what all of the files in your project look like at that point. Git is more like a mini filesystem with some incredibly powerful tools built on top of it, rather than simply a VCS.
+
+We will explore 5 famous git commands.
+
+1. **git init**
+2. **git add**
+3. **git commit**
+4. **git branch**
+5. **git merge** 
+
+Apart from that, we will also explore the HEAD pointers.
+
+### git init
+
+This is what an empty git repository looks like, after running `git init`. We will only focus on `HEAD`, `objects/`, `refs/`, `heads/` and `tags/`.
+
+```bash
+$ git init
+$ tree .git
+
+.git
+├── HEAD
+├── config
+├── description
+├── hooks
+│   ├── applypatch-msg.sample
+│   ├── commit-msg.sample
+│   ├── fsmonitor-watchman.sample
+│   ├── post-update.sample
+│   ├── pre-applypatch.sample
+│   ├── pre-commit.sample
+│   ├── pre-merge-commit.sample
+│   ├── pre-push.sample
+│   ├── pre-rebase.sample
+│   ├── pre-receive.sample
+│   ├── prepare-commit-msg.sample
+│   ├── push-to-checkout.sample
+│   └── update.sample
+├── info
+│   └── exclude
+├── objects
+│   ├── info
+│   └── pack
+└── refs
+├── heads
+└── tags
+```
+
+### add & commit
+
+Create a new file and put some content in it.
+
+```bash
+$ echo "console.log("Hello World");" > new.js && cat new.js
+console.log("Hello World");
+```
+
+### git add
+
+After adding a new object is created `ac/cefceba62b4874a613a2336de33ee716e99931` 
+
+```bash
+$ git add new.js
+.git
+├── HEAD
+├── objects
+│   ├── ac
+│   │   └── cefceba62b4874a613a2336de33ee716e99931
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    └── tags
+```
+
+It is a unique SHA hash and we can address the hash using the first 4 characters, `acce`. However, the directory structure is slightly odd. Why is there a subdirectory?
+Git objects can grow up 10k+ in number and File Systems don’t really like it when you have a really high number of files in one directory. So to keep the files manageable git creates a directory first.
+ 
+
+### blob object
+
+Git ships with a really convenient plumbing command `cat-file` to print all the contents in the file. We can look at the content of the hash `acce` This command needs just the first 4 characters of the hash. That’s unique for all the hash created. The hash file contains the content of `main.js`. The type of the hash is a blob. *blob* is one of the **git object types**. *Blob* means “binary large object”. When we `git add` git creates a *blob* object for that file. *blob* is the git object type for storing files.
+
+
+```bash
+$ git cat-file -p acce
+console.log("Hello World");
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+$ git cat-file -t acce
+blob
+```
+
+### commit
+
+
+```bash
+# commit the changes after adding.
+$ git commit -m "first commit"
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# look at the contents of the git directory.
+$ tree .git
+.git
+├── COMMIT_EDITMSG
+├── HEAD
+├── logs
+│   ├── HEAD
+│   └── refs
+│       └── heads
+│           └── master
+├── objects
+│   ├── 26
+│   │   └── c7fccd29746f6775d8f291c6e0bbdfba6a4aac
+│   ├── 8e
+│   │   └── 62e9859f9e0283f159a0a94a6ea7a7372e9b56
+│   ├── ac
+│   │   └── cefceba62b4874a613a2336de33ee716e99931
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    │   └── master
+    └── tags
+
+14 directories, 25 files
+
+```
+
+After the commit, we have two new hashes, `26c7` and `8e62`. One is the object tree and the other is the commit hash object. First, the tree is created and then the commit object gets created. While a tree represents a particular directory state of a working directory, a commit represents that state in "time" and explains how to get there. The commit object contains the directory tree object hash, parent commit hash, author, committer, date and message. We’ll come back to the other object later. Let’s explore the commit object `26c7`.
+
+
+The commit hash contains the names and references to an object called **tree**. The hash of the tree `8e62` is the other hash file that was created. We can check the type of a git object using `git cat-file -t`. It returns the object type as `commit`.
+
+```bash
+$ git cat-file -p 26c7
+tree 8e62e9859f9e0283f159a0a94a6ea7a7372e9b56
+author Shubham Srivastava <shbm@Shubhams-MacBook-Air.local> 1656713957 +0200
+committer Shubham Srivastava <shbm@Shubhams-MacBook-Air.local> 1656713957 +0200
+
+first commit
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+$ git cat-file -t 26c7
+commit
+```
+
+### **tree**
+
+The content of commit object has a reference `tree 8e62e9859f9e0283f159a0a94a6ea7a7372e9b56`. Trees are pointers to file names, content, and other trees. The tree is employed for storing filename and is also used to store a group of files together. Git stores content similar to the UNIX filesystem, but a bit simplified. All the content is stored as tree and blob objects, with trees corresponding to UNIX directory entries and blobs corresponding more or less to inodes or file contents. A single tree object contains one or more entries, each of which is the SHA-1 hash of a blob or subtree with its associated mode, type, and filename.
+
+This is what a tree file looks like.
+
+```bash
+$ git cat-file 8e62
+100644 blob accefceba62b4874a613a2336de33ee716e99931	main.js
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+$ git cat-file -t 8e62
+tree
+```
+
+The tree object contains one line per file or subdirectory, with each line giving file *permissions(`10644`), object type(`blob`), object hash(*`acce`) *and filename (`main.js`)*. *Object type* is either “blob” for a file or “tree” for a subdirectory.
+
+### master branch pointer
+
+We have a file `refs/heads/master`, a HEAD pointer for the master and it points to the latest commit. You can create different branches and they create different pointers.
+
+```bash
+# content of master pointer
+$ cat .git/refs/heads/master
+26c7fccd29746f6775d8f291c6e0bbdfba6a4aac
+
+****                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# HEAD and master
+$ git log
+commit 26c7fccd29746f6775d8f291c6e0bbdfba6a4aac (HEAD -> master)
+Author: Shubham Srivastava <shbm@Shubhams-MacBook-Air.local>
+Date:   Sat Jul 2 00:19:17 2022 +0200
+
+    first commit
+```
+
+### branch & merge
+
+`git branch -b feature` creates a new branch. It also creates a new HEAD for the feature branch. At this point of branching, the feature branch shares the same location as the master. We can verify it by looking at `refs/logs/heads/feature`.
+
+```bash
+$ git branch -b feature
+.git
+├── COMMIT_EDITMSG
+├── HEAD
+├── logs
+│   ├── HEAD
+│   └── refs
+│       └── heads
+│           ├── feature
+│           └── master
+├── objects
+│   ├── 26
+│   │   └── c7fccd29746f6775d8f291c6e0bbdfba6a4aac
+│   ├── 8e
+│   │   └── 62e9859f9e0283f159a0a94a6ea7a7372e9b56
+│   ├── ac
+│   │   └── cefceba62b4874a613a2336de33ee716e99931
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    │   ├── feature
+    │   └── master
+    └── tags
+
+14 directories, 25 files
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# Which pointer does the feature HEAD point? Same as master's HEAD.
+$ cat .git/logs/refs/heads/feature
+0000000000000000000000000000000000000000 26c7fccd29746f6775d8f291c6e0bbdfba6a4aac Shubham Srivastava [shbm@Shubhams-MacBook-Air.local](mailto:shbm@Shubhams-MacBook-Air.local) 1656722666 +0200	branch: Created from HEAD
+
+```
+
+Modify `main.js` to make changes in the feature branch. The file now contains.
+
+```bash
+$ cat main.js
+console.log("Hello World");
+console.log("Feature");
+```
+
+Adding a new file creates a new object. As seen previously, it creates a new blob object.
+
+```bash
+$ git add mains.js
+.git
+├── COMMIT_EDITMSG
+├── HEAD
+├── logs
+│   ├── HEAD
+│   └── refs
+│       └── heads
+│           ├── feature
+│           └── master
+├── objects
+│   ├── 07
+│   │   └── 99851535ee3b53930befa9a383691eaa29ed9d
+│   ├── 26
+│   │   └── c7fccd29746f6775d8f291c6e0bbdfba6a4aac
+│   ├── 8e
+│   │   └── 62e9859f9e0283f159a0a94a6ea7a7372e9b56
+│   ├── ac
+│   │   └── cefceba62b4874a613a2336de33ee716e99931
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    │   ├── feature
+    │   └── master
+    └── tags
+
+15 directories, 28 files
+```
+
+The new blob object contains the latest version of `mains.js`.
+
+```bash
+# What does the newly created hash file contains?
+$ git cat-file -p 0799
+console.log("Hello World");
+console.log("Feature");
+```
+
+As seen previously, committing crates two objects; the tree object and the commit object. `a150` is the tree file and `d23a` is the commit object. The HEAD of the feature branch has also changed which now contains the latest commit in the feature branch. And since we’re on a different branch the HEAD includes a ref to `refs/heads/feature`.
+
+```bash
+$ git commit -m “feature”
+.git
+├── COMMIT_EDITMSG
+├── HEAD
+├── logs
+│   ├── HEAD
+│   └── refs
+│       └── heads
+│           ├── feature
+│           └── master
+├── objects
+│   ├── 07
+│   │   └── 99851535ee3b53930befa9a383691eaa29ed9d
+│   ├── 26
+│   │   └── c7fccd29746f6775d8f291c6e0bbdfba6a4aac
+│   ├── 8e
+│   │   └── 62e9859f9e0283f159a0a94a6ea7a7372e9b56
+│   ├── a1
+│   │   └── 50a1687ff7dd85b374a223d99259836fa8a0cd
+│   ├── ac
+│   │   └── cefceba62b4874a613a2336de33ee716e99931
+│   ├── d2
+│   │   └── 3a3ba983a7d4ab08cc47e9a5b8189139e6712a
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    │   ├── feature
+    │   └── master
+    └── tags
+
+17 directories, 30 files
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# a150 is the tree file. It contains ref of 0799, the main.js file with new     edits.
+$ git cat-file -p a150
+100644 blob 0799851535ee3b53930befa9a383691eaa29ed9d	main.js
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# d23a is the commit hash of the feature branch. It contains tree a150 as the   content
+$ git cat-file -p d23a
+tree a150a1687ff7dd85b374a223d99259836fa8a0cd
+parent 26c7fccd29746f6775d8f291c6e0bbdfba6a4aac
+author Shubham Srivastava <shbm@Shubhams-MacBook-Air.local> 1656714340 +0200
+committer Shubham Srivastava <shbm@Shubhams-MacBook-Air.local> 1656714340 +0200
+
+feature commit
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# the HEAD pointer of feature brach
+$ cat .git/refs/heads/feature
+d23a3ba983a7d4ab08cc47e9a5b8189139e6712a
+
+# the current head
+$ cat .git/HEAD
+ref: refs/heads/feature
+
+```
+
+Checking out master creates changes to the HEAD. It moves the HEAD back to the master’s HEAD.
+
+```bash
+
+# Let's change the branch and print HEAD again
+$ git checkout master
+Switched to branch 'master'
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# HEAD file is the latest head.
+# soft-reset HEAD~1
+$ cat .git/HEAD
+ref: refs/heads/master
+```
+
+We’ve learned about all the git objects and a basic idea about what happens when we execute some of the git commands. Now we will create a new commit with only the porcelain commands.
+
+## bottoms up git
+
+Let’s create a new directory structure which looks like `.git`
+
+```bash
+$ tree .git
+.git
+├── HEAD
+├── config
+├── info
+│   └── exclude
+├── objects
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    └── tags
+```
+
+### hash-object
+
+This command computes the object ID value for an object with a specified type with the contents of the named file (which can be outside of the work tree). `-w` optionally writes the resulting object into the object database. When `<type>` is not specified, it defaults to "**blob**". So we created a new blob hash with the content “Hello World” in the database.****
+
+```bash
+$ echo "Hello World" | git hash-object --stdin -w
+557db03de997c86a4a028e1ebd3a1ceb225be238
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+$ tree .git
+.git
+├── HEAD
+├── config
+├── info
+│   └── exclude
+├── objects
+│   ├── 55
+│   │   └── 7db03de997c86a4a028e1ebd3a1ceb225be238
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    └── tags
+```
+
+We can verify what the contents are using `cat-file`
+
+```bash
+$ git cat-file -p 557d
+Hello World
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+$ git cat-file -t 557d
+blob
+```
+
+### update-index
+
+Modifies the index. Each file mentioned in the command is updated in the index. To bring a file to the staging area we use update-index. But if we look at the status, it returns a strange status. It shows a new file as hello and also a deleted file called hello.
+
+```bash
+$ git update-index --add --cacheinfo 10644 557db03de997c86a4a028e1ebd3a1ceb225be238 hello
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+$ git status
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+	new file:   hello
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	deleted:    hello
+```
+
+### write-tree
+
+We can create a new tree object using `write-tree`. It creates a tree object using the current index. The name of the new tree object is printed to standard output. Conceptually, ***git write-tree*** sync’s the current index contents into a set of tree files. We can see the object in the `.git/objects` directory. We can verify the contents of the hash using `cat-file`.
+
+```bash
+# creates a new tree object
+$ git write-tree
+117c62a8c5e01758bd284126a6af69deab9dbbe2
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+$ tree .git
+.git
+├── HEAD
+├── config
+├── index
+├── info
+│   └── exclude
+├── objects
+│   ├── 11
+│   │   └── 7c62a8c5e01758bd284126a6af69deab9dbbe2
+│   ├── 55
+│   │   └── 7db03de997c86a4a028e1ebd3a1ceb225be238
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    └── tags
+
+$ git cat-file -p 117c
+100644 blob 557db03de997c86a4a028e1ebd3a1ceb225be238	hello
+```
+
+### commit-tree
+
+However, the status does not change because we haven’t added that tree object to a commit object. To create a new commit, git uses `commit-tree` which creates a new commit and takes in the hash of the tree object. commit-tree creates a new commit object based on the provided tree object and emits the new commit object id on stdout. 
+
+```bash
+$ git commit-tree 117c -m "First Commit"
+63dc01736bdd6b7e5d15e3b871590573550704fd
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+$ tree .git
+.git
+├── HEAD
+├── config
+├── index
+├── info
+│   └── exclude
+├── objects
+│   ├── 11
+│   │   └── 7c62a8c5e01758bd284126a6af69deab9dbbe2
+│   ├── 55
+│   │   └── 7db03de997c86a4a028e1ebd3a1ceb225be238
+│   ├── 63
+│   │   └── dc01736bdd6b7e5d15e3b871590573550704fd
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    └── tags
+
+10 directories, 7 files
+
+$ git cat-file -p 63dc01736bdd6b7e5d15e3b871590573550704fd
+tree 117c62a8c5e01758bd284126a6af69deab9dbbe2
+author Shubham Srivastava <shbm@Shubhams-MacBook-Air.local> 1656808916 +0200
+committer Shubham Srivastava <shbm@Shubhams-MacBook-Air.local> 1656808916 +0200
+
+First Commit
+```
+
+However, the status is still not happy.
+
+```bash
+$ git status
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+	new file:   hello
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	deleted:    hello
+```
+
+### changing HEAD
+
+There’s a file called HEAD which references `refs/heads/master`. Although there is no file in that location. It needs to be created `echo 63dc01736bdd6b7e5d15e3b871590573550704fd > .git/refs/heads/master`. HEAD references the latest commit in the working tree. Normally a commit would identify a new "HEAD" state, and while Git doesn’t care where you save the note about that state, in practice we tend to just write the result to the file that is pointed at by `.git/HEAD`, so that we can always see what the last committed state was.
+
+```bash
+$ cat .git/HEAD
+ref: refs/heads/master
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# no file refs/heads/master
+$ tree .git
+.git
+├── HEAD
+├── config
+├── index
+├── info
+│   └── exclude
+├── objects
+│   ├── 11
+│   │   └── 7c62a8c5e01758bd284126a6af69deab9dbbe2
+│   ├── 55
+│   │   └── 7db03de997c86a4a028e1ebd3a1ceb225be238
+│   ├── 63
+│   │   └── dc01736bdd6b7e5d15e3b871590573550704fd
+│   ├── info
+│   └── pack
+└── refs
+    ├── heads
+    └── tags
+
+10 directories, 7 files
+
+# Git is looking for the latest pointer in HEAD.
+# The latest pointer should be the latest commit.
+$ echo 63dc01736bdd6b7e5d15e3b871590573550704fd > .git/refs/heads/master
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# the log contains the hash now
+$ git log
+commit 63dc01736bdd6b7e5d15e3b871590573550704fd (HEAD -> master)
+Author: Shubham Srivastava <shbm@Shubhams-MacBook-Air.local>
+Date:   Sun Jul 3 02:41:56 2022 +0200
+
+    First Commit
+
+                   #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+# Now if we look at the status we get something different.
+# Still not 100% happy.
+$ git status
+On branch master
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	deleted:    hello
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+
+### git checkout
+
+Why is a status not completely happy. The log contains the latest commit but a final piece is missing. Although we have added the latest commit in the working tree we haven’t moved to that pointer yet. We need to use `checkout` to bring it to the latest HEAD pointer.
+
+TIP: `--` is used by git to run an operation on a specific file.
+
+```bash
+# -- in git applies a command to a specific file. hello was created when update-index was executed
+$ git checkout HEAD -- hello
+```
+
+Finally, Git is happy.
+
+```bash
+# The status is now clean
+$ git status
+On branch master
+nothing to commit, working tree clean
+```
