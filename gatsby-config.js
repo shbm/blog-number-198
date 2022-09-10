@@ -30,19 +30,19 @@ module.exports = {
         ],
         externalLinks: [
           {
-            name: `Twitter`,
+            name: `Twitter 🐦`,
             url: `https://twitter.com/global_minima`,
           },
           {
-            name: `LinkedIn`,
+            name: `LinkedIn 👔`,
             url: `https://www.linkedin.com/in/shbm`,
           },
           {
-            name: `Bookmarks`,
+            name: `Bookmarks 🔖`,
             url: `/bookmarks`,
           },
           {
-            name: `Email`,
+            name: `Email 📧`,
             url: `mailto:shbm09@gmail.com`,
           },
         ],
