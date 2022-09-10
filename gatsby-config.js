@@ -34,6 +34,10 @@ module.exports = {
             url: `https://twitter.com/global_minima`,
           },
           {
+            name: `LinkedIn`,
+            url: `https://www.linkedin.com/in/shbm`,
+          },
+          {
             name: `Bookmarks`,
             url: `/bookmarks`,
           },
